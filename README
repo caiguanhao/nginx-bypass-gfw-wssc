@@ -1,0 +1,106 @@
+FUCK Great Firewall with NGINX and self-signed certificate
+==========================================================
+
+This is by far the fastest way to bypass the Great Firewall.
+It's only https. Best for your use only. Normally, you can
+watch 1080p YouTube videos without any lag under a 6M network
+if you configure it with a digitalocean VPS.
+
+One thing noted is that since GFW also uses "keyword filter",
+which resets your connection if you visit those blocked websites
+via http (not https), you are likely limited to access websites
+that are able to serve on https, like Google, Twitter (unless
+you make a more specific nginx config for yourself).
+
+The 'fake' (self-signed) certificate will contain a list of
+blocked domain names you want to visit. You can get a list of
+these domains (Subject Alternative Names) from the 'real'
+certificate by using this command function:
+
+lssan () {
+  [[ $# -ne 1 ]] && echo 'Usage: lssan <DOMAIN>' || {
+    openssl s_client -connect $1:443 </dev/null 2>/dev/null | \
+    openssl x509 -text -noout | grep 'X509v3 Subject Alternative Name' -A 1 | \
+    tail -1 | tr ',' '\n' | awk -F: '{print $2}'
+  }
+}
+
+(copy and paste this function to your terminal, and run
+"lssan google.com", for example)
+
+Now, you need to make a key and a cert using the openssl
+command.
+
+After that, trust the cert on your local machine and put it on
+your server outside China. It's better to use NGINX, since it
+is efficient and easy to configure (and it has an SPDY plugin).
+Make an nginx config file whose "server_name" contains those
+blocked domains. You can use a regular expression to do that.
+
+Once you have set up the server, one thing to do is to point all
+these blocked domain names to the IP address of your server.
+Modifying /etc/hosts works, but it is painful. You can use
+dnsmasq to redirect all sub-domains under those blocked domains
+to your server easily.
+
+Chrome on Mac works (you just open the cert and trust it, and
+it will appear in the Keychain Access.app.). Some other browsers
+might not work since they have different certificate policies.
+
+
+USAGE
+-----
+
+make update-nginx-rules
+make dnsmasq-rules
+make self-signed-cert
+
+
+MAC OS X WALKTHROUGH
+--------------------
+
+0. Run 'brew install dnsmasq' to install dnsmasq and follow
+   the instruction to run it when system starts.
+
+1. You may probably need to modify the file -
+   /Library/LaunchDaemons/homebrew.mxcl.dnsmasq.plist
+   so it won't conflict with /etc/resolv.conf.
+
+    <array>
+      <string>/usr/local/opt/dnsmasq/sbin/dnsmasq</string>
+      <string>-r</string>
+      <string>/etc/resolv.dnsmasq.conf</string>
+      <string>--keep-in-foreground</string>
+    </array>
+
+2. You can add/remove domain names in the file: blocked-sites.
+
+3. Run 'make dnsmasq-rules | pbcopy'. Enter your server IP.
+
+4. Run 'EDITOR="open -Wne" sudo -e /usr/local/etc/dnsmasq.conf',
+   paste the content to the end of the dnsmasq config file.
+   When you have done editing, quit the app.
+
+5. Restart dnsmasq:
+   sudo launchctl unload /Library/LaunchDaemons/homebrew.mxcl.dnsmasq.plist
+   sudo launchctl load /Library/LaunchDaemons/homebrew.mxcl.dnsmasq.plist
+
+6. Run 'dig google.com @localhost' to see if it resolves to your
+   server's IP address.
+
+7. Change your network DNS to 127.0.0.1.
+
+8. Run 'dig google.com' to see if it resolves to your server's
+   IP address.
+
+9. Run 'make self-signed-cert' and copy the cert and the key
+   file to your nginx server. Open the .crt file and trust it.
+   Or you can run this command:
+   sudo security add-trusted-cert -d -r trustRoot -k \
+   /Library/Keychains/System.keychain certificate.crt
+
+10.Run 'make update-nginx-rules | pbcopy' and put the nginx
+   config to your server's nginx configs. Remember to edit the
+   cert and key path, and restart nginx to let configs take effect.
+
+11.Open your Google Chrome and enjoy!
