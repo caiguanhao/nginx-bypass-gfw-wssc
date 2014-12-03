@@ -23,6 +23,11 @@ dnsmasq-rules:
 	if [[ -z "$$IP" ]]; then IP="127.0.0.1"; fi && \
 	make read-list | awk '{print "address=/"$$0"/'$$IP'"}'
 
+acrylic-rules:
+	@read -p "IP address of your server? (127.0.0.1) " IP && \
+	if [[ -z "$$IP" ]]; then IP="127.0.0.1"; fi && \
+	grep -v '^#' $(LIST) | grep -v '^$$' | awk '{sub(/=$$/,"",$$0);print "'$$IP' "$$0}'
+
 openssl-config:
 	@printf \
 	"[req]\n"\
